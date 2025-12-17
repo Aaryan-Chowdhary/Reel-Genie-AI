@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoReel Studio</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&family=Cinzel:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --secondary: #9333ea;
+            --gold: #fbbf24;
+            --bg-dark: #050510;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-dark);
+            color: white;
+            overflow: hidden; /* No scrolling */
+            height: 100vh;
+            margin: 0;
+        }
+
+        /* --- BACKGROUND --- */
+        .mesh-bg { position: absolute; width: 100%; height: 100%; z-index: -2; background: radial-gradient(at 50% 0%, hsla(225,39%,20%,1) 0, transparent 70%), radial-gradient(at 100% 100%, hsla(339,49%,20%,1) 0, transparent 70%); opacity: 0.8; }
+
+        /* --- SMOKE & LOADING OVERLAY --- */
+        #loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 9999; pointer-events: none; opacity: 0;
+            transition: opacity 1s ease-in-out;
+            background: rgba(5, 5, 16, 0.95); /* Dark background */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* The Smoke Clouds */
+        .smoke-cloud {
+            position: absolute; top: 50%; left: 50%; width: 150vmax; height: 150vmax;
+            transform: translate(-50%, -50%); mix-blend-mode: screen; opacity: 0; transition: opacity 2s;
+        }
+        .cloud-1 { background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, transparent 60%); animation: cloudMove 8s infinite alternate; }
+        .cloud-2 { background: radial-gradient(circle, rgba(6, 182, 212, 0.3) 0%, transparent 60%); animation: cloudMove 12s infinite alternate-reverse; }
+        @keyframes cloudMove { 100% { transform: translate(-50%, -50%) scale(1.1) rotate(5deg); } }
+
+        /* THE LOADING GENIE - MASSIVE SIZE UPDATE */
+        .loading-genie-img {
+            width: auto;
+            /* Height based size to ensure it's huge but fits vertically */
+            height: 60vh; 
+            max-width: 90vw; /* Prevent horizontal overflow on mobile */
+            transform: translateY(100px) scale(0.8);
+            opacity: 0;
+            transition: all 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            filter: drop-shadow(0 0 60px var(--primary));
+            z-index: 10;
+        }
+
+        .loading-text {
+            font-family: 'Cinzel', serif;
+            font-size: 2.5rem; /* Bigger Text */
+            color: var(--gold);
+            margin-top: 30px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 1s ease 0.5s; 
+            z-index: 10;
+            text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+            text-align: center;
+        }
+
+        /* Active State Classes */
+        .overlay-active { opacity: 1 !important; pointer-events: all !important; }
+        .overlay-active .smoke-cloud { opacity: 1; }
+        .overlay-active .loading-genie-img { opacity: 1; transform: translateY(0) scale(1); }
+        .overlay-active .loading-text { opacity: 1; transform: translateY(0); }
+
+
+        /* --- MAIN LAYOUT --- */
+        .main-wrapper {
+            height: 100vh;
+            width: 100%;
+            transition: opacity 0.5s ease;
+        }
+
+        /* Centered Input Card (Initial View) */
+        .center-stage {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .input-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 50px;
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+        }
+
+        /* Split Result View (Hidden Initially) */
+        .split-stage {
+            display: none; 
+            height: 100%;
+            width: 100%;
+        }
+        .video-side {
+            background: rgba(0,0,0,0.4);
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            padding: 20px; /* Add slight padding so video doesn't touch edges */
+        }
+        .controls-side {
+            display: flex; flex-direction: column; justify-content: center; padding: 40px;
+        }
+
+        /* Elements */
+        input { width: 100%; padding: 20px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.4); color: white; margin-bottom: 20px; font-size: 1.1rem; text-align: center; outline: none; transition: 0.3s; }
+        input:focus { border-color: var(--primary); box-shadow: 0 0 15px rgba(79, 70, 229, 0.3); }
+        
+        button { width: 100%; padding: 20px; border-radius: 12px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border: none; color: white; font-weight: bold; font-size: 1.2rem; cursor: pointer; transition: 0.3s; }
+        button:hover { transform: scale(1.02); box-shadow: 0 0 30px rgba(147, 51, 234, 0.5); }
+
+        /* VIDEO PLAYER - MAXIMIZED SIZE */
+        video { 
+            height: 90vh; /* Forces video to be 90% of screen height */
+            width: auto;  /* Maintains aspect ratio */
+            max-width: 100%; 
+            border-radius: 16px; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5); 
+            border: 2px solid rgba(255,255,255,0.1); 
+        }
+        
+    </style>
+</head>
+<body>
+
+    <div class="mesh-bg"></div>
+
+    <div id="loading-overlay">
+        <div class="smoke-cloud cloud-1"></div>
+        <div class="smoke-cloud cloud-2"></div>
+        
+        <img src="{{ url_for('static', filename='genie-loading.png') }}" class="loading-genie-img" alt="Genie working">
+        
+        <div class="loading-text">"Your wish is my command..."</div>
+    </div>
+
+
+    <div class="main-wrapper">
+        
+        <div class="center-stage" id="initialView">
+            <div class="input-card">
+                <h1 style="font-family: 'Cinzel', serif; font-size: 3rem; margin-bottom: 10px;">Make a Wish</h1>
+                <p style="color:#aaa; margin-bottom: 30px;">Describe your reel in one sentence.</p>
+                <form id="mainForm">
+                    <input type="text" id="topicInput" placeholder="e.g. A cyberpunk city in rain..." required autocomplete="off">
+                    <button type="submit">✨ Summon Reel</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="split-stage row g-0" id="resultView">
+            <div class="col-md-7 video-side">
+                <video id="finalVideo" controls autoplay loop>
+                    <source src="" type="video/mp4">
+                </video>
+            </div>
+
+            <div class="col-md-5 controls-side">
+                <h2 style="font-family: 'Cinzel', serif; color: var(--gold); font-size: 2.5rem;">Wish Granted!</h2>
+                <p style="color:#ccc; font-size: 1.2rem;">Your reel has been materialized from the ether.</p>
+                
+                <div class="mt-4">
+                    <a href="#" id="downloadLink" class="btn btn-outline-light w-100 py-3 mb-3" download>⬇ Download HD Video</a>
+                    <button onclick="location.reload()" class="btn btn-primary w-100 py-3">🔄 Make Another Wish</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const mainForm = document.getElementById('mainForm');
+        const overlay = document.getElementById('loading-overlay');
+        const initialView = document.getElementById('initialView');
+        const resultView = document.getElementById('resultView');
+        const videoPlayer = document.getElementById('finalVideo');
+        const dwnLink = document.getElementById('downloadLink');
+
+        mainForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const topic = document.getElementById('topicInput').value;
+
+            // 1. ACTIVATE LOADING STATE
+            overlay.classList.add('overlay-active');
+
+            // 2. SEND REQUEST TO SERVER
+            try {
+                const formData = new FormData();
+                formData.append('topic', topic);
+
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    // 3. PREPARE RESULT
+                    videoPlayer.src = data.video_url + "?t=" + new Date().getTime();
+                    dwnLink.href = data.video_url;
+
+                    // Switch Layouts
+                    initialView.style.display = 'none';
+                    resultView.style.display = 'flex';
+
+                    // 4. REVEAL
+                    setTimeout(() => {
+                        overlay.classList.remove('overlay-active');
+                    }, 1000); 
+                }
+
+            } catch (error) {
+                console.error("Error:", error);
+                alert("The magic failed! Check server console.");
+                overlay.classList.remove('overlay-active');
+            }
+        });
+    </script>
+</body>
+</html>
